@@ -1,5 +1,5 @@
 '''
-A Reccurent Neural Network (LSTM) implementation example using TensorFlow library.
+A Reccurent Neural Network (RNN) implementation example using TensorFlow library.
 
 Based on:
 Author: Aymeric Damien
@@ -17,7 +17,7 @@ import numpy as np
 import preprocessing as pre
 import sklearn.metrics as metrics
 
-#paths to data and labels
+#Some other parameters
 pathData1 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/CNE/*16k.wav'
 pathData2 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/GEN/*16k.wav'
 pathData3 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/HRO/*16k.wav'
@@ -25,7 +25,7 @@ pathData4 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/ICO/*16k.wav'
 pathData5 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/KTA/*16k.wav'
 pathData6 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/LHE/*16k.wav'
 pathData7 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/MDU/*16k.wav'
-pathData8 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/SCO/*16k.wav'
+pathData8 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/audio_data/LTU/*16k.wav'
 
 pathLabel1 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/labels_CNE.csv'
 pathLabel2 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/labels_GEN.csv'
@@ -34,7 +34,7 @@ pathLabel4 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/lab
 pathLabel5 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/labels_KTA.csv'
 pathLabel6 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/labels_LHE.csv'
 pathLabel7 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/labels_MDU.csv'
-pathLabel8 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/labels_SCO.csv'
+pathLabel8 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/Labels_as_csv/labels_LTU.csv'
 
 pathTimes1 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_csv/startEnd_time_CNE.csv'
 pathTimes2 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_csv/startEnd_time_GEN.csv'
@@ -43,12 +43,12 @@ pathTimes4 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_c
 pathTimes5 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_csv/startEnd_time_KTA.csv'
 pathTimes6 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_csv/startEnd_time_LHE.csv'
 pathTimes7 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_csv/startEnd_time_MDU.csv'
-pathTimes8 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_csv/startEnd_time_SCO.csv'
+pathTimes8 = '/home/huynh-tan/Dokumente/Bachelor_Thesis/Labels/StartEndTime_as_csv/startEnd_time_LTU.csv'
 
 #parameters for preprocessing
 sampleRate = 16000
 maxSentenceStep = 9*sampleRate
-maxWordStep = int(0.84*sampleRate)
+maxWordStep = int(0.29*sampleRate)
 
 #reading the data and preprocessing
 examples1, labels1 = pre.makeInputSeq(pathData1, pathTimes1, pathLabel1, maxSentenceStep, maxWordStep, sampleRate)
@@ -66,20 +66,19 @@ examples = np.concatenate((examples1, examples2, examples3, examples4, examples5
 labels = np.concatenate((labels1, labels2, labels3, labels4, labels5, labels6, labels7))
 
 # Parameters
-learning_rate = 0.001
-forget_bias = 2.0
-hyperParam = 0.2
-batch_size = 200
+learning_rate = 0.0625
+hyperParam = 0.25
+batch_size = 300
 numEx = examples.shape[0]
 epochs = int(numEx/batch_size)+1
 display_step = 1
-training_iter = 200
+training_iter = 70
 numFrames = examples.shape[1]
 
 # Network Parameters
 n_input = 13 # MFCC frame Input shape numFrame*shape
 n_steps = numFrames # numFrames
-n_hidden = 100 # hidden layer num of features
+n_hidden = 70 # hidden layer num of features
 n_classes = 2 # Prominence classes [1, 0] prominent or [0, 1] not prominent
 
 
@@ -110,10 +109,10 @@ def RNN(x, weights, biases):
     x = tf.split(0, n_steps, x)
 
     # Define a lstm cell with tensorflow
-    lstm_cell = rnn_cell.BasicLSTMCell(n_hidden, forget_bias=forget_bias)
+    rnnCell = rnn_cell.BasicRNNCell(n_hidden)
 
     # Get lstm cell output
-    outputs, states = rnn.rnn(lstm_cell, x, dtype=tf.float32)
+    outputs, states = rnn.rnn(rnnCell, x, dtype=tf.float32)
 
     # Linear activation, using rnn inner loop last output
     return tf.matmul(outputs[-1], weights['out']) + biases['out']
@@ -125,7 +124,7 @@ def l2regularization(weights, biases):
 '''
 Mixing the Input
 '''
-def mixExamples(examples, labels, numFrames, numEx):
+def mixExamples(examples, labels, numFrames):
     mixedArray = np.arange(len(examples))  # number of datas
     np.random.shuffle(mixedArray)
     _x_mix = np.zeros([numEx, numFrames, 13])
@@ -153,7 +152,7 @@ correct_pred = tf.equal(tf.argmax(pred,1), tf.argmax(y,1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 #Mix the input data
-_x, _y = mixExamples(examples, labels, numFrames, numEx)
+_x, _y = mixExamples(examples, labels, numFrames)
 
 # Initializing the variables
 init = tf.initialize_all_variables()
@@ -171,7 +170,7 @@ with tf.Session() as sess:
         if index > numEx:
             step = 0
             index = 0
-            _x, _y = mixExamples(examples, labels, numFrames, numEx)
+            _x, _y = mixExamples(examples, labels, numFrames)
         else:
             step += 1
 
@@ -194,10 +193,9 @@ with tf.Session() as sess:
     print("Optimization Finished!")
 
     # Calculate accuracy
-    numTest = len(test_data)
-    _x = test_data.reshape((numTest, n_steps, n_input))
+    _x = test_data.reshape((len(test_data), n_steps, n_input))
     _y = test_labels
-    _x, _y = mixExamples(_x, _y, numFrames, numTest)
+    #_x, _y = mixExamples(_x, _y, numFrames)
     _y_ = np.argmax(_y, 1)
 
     acc1 , _pred_ = sess.run([accuracy, pred1], feed_dict={x: _x, y: _y})
@@ -206,7 +204,7 @@ with tf.Session() as sess:
 
     confusion_matrix = metrics.confusion_matrix(_y_, _pred_, [0, 1])
     recall = metrics.recall_score(_y_, _pred_)
-    specificity = confusion_matrix[0, 0] / (confusion_matrix[0, 0] + confusion_matrix[1, 0])
+    specificity = confusion_matrix[0, 0]/(confusion_matrix[0, 0]+confusion_matrix[0, 1])
     uwAccuracy = (recall+specificity)/2
 
     print("Confusion Matrix\n", confusion_matrix)
@@ -215,3 +213,4 @@ with tf.Session() as sess:
     print("F1 Score\n", metrics.f1_score(_y_, _pred_))
     print("Recall Score\n", recall)
     print("Precision Score\n", metrics.precision_score(_y_, _pred_))
+
